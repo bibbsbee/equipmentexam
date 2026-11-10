@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Generator Jadwal Ujian & Pengawas Presisi</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            @page { size: landscape; margin: 5mm; }
+            body { background: white; -webkit-print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-landscape { width: 100%; max-width: none; border: none !important; box-shadow: none !important; padding: 0 !important; }
+            table { font-size: 9px !important; }
+            th, td { padding: 3px 4px !important; }
+        }
+        .multi-select-dropdown { max-height: 150px; overflow-y: auto; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header Instansi Dinamis -->
+    <header class="bg-slate-900 text-white shadow-md no-print">
+        <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 id="app-instansi-name" class="text-2xl font-bold tracking-tight">[Nama Sekolah / Instansi]</h1>
+                <p id="app-instansi-address" class="text-slate-400 text-sm">Alamat Instansi / Jalan</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="app-exam-badge" class="bg-amber-600 text-white px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">SAS / STS / SAT</span>
+                <button onclick="switchTab('tab-setup')" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-sm font-medium border border-slate-700 transition">⚙️ Pengaturan Kop & Waktu</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigasi Tab -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs no-print">
+        <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto space-x-6">
+            <button onclick="switchTab('tab-setup')" id="btn-tab-setup" class="py-4 px-2 border-b-2 border-blue-600 text-blue-600 font-semibold text-sm whitespace-nowrap transition">1. Setup Kop & Waktu Khusus</button>
+            <button onclick="switchTab('tab-teachers')" id="btn-tab-teachers" class="py-4 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 font-medium text-sm whitespace-nowrap transition">2. Master Mapel & Guru (Multi-Mapel)</button>
+            <button onclick="switchTab('tab-rooms')" id="btn-tab-rooms" class="py-4 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 font-medium text-sm whitespace-nowrap transition">3. Ruang & Jadwal 2 Sesi</button>
+            <button onclick="switchTab('tab-generator')" id="btn-tab-generator" class="py-4 px-2 border-b-2 border-transparent text-slate-500 hover:text-slate-800 font-medium text-sm whitespace-nowrap transition">4. Matrix Generator & Export</button>
+        </div>
+    </nav>
+
+    <!-- Konten Utama -->
+    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+
+        <!-- TAB 1: SETUP KOP & WAKTU KHUSUS -->
+        <section id="tab-setup" class="space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-4">Informasi Umum Ujian & Instansi</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nama Instansi / Sekolah</label>
+                        <input type="text" id="input-instansi" value="" placeholder="Ketik Nama Instansi..." onfocus="clearPlaceholder(this)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Alamat Instansi</label>
+                        <input type="text" id="input-alamat" value="" placeholder="Ketik Alamat..." onfocus="clearPlaceholder(this)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Jenis Ujian (SAS / STS / SAT)</label>
+                        <input type="text" id="input-jenis-ujian" value="" placeholder="Contoh: SUMATIF AKHIR SEMESTER (SAS) GANJIL" onfocus="clearPlaceholder(this)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Tahun Pelajaran</label>
+                        <input type="text" id="input-ta" value="" placeholder="Contoh: 2026/2027" onfocus="clearPlaceholder(this)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Jam Kegiatan & Waktu Khusus Ujian -->
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-2">Pengaturan Waktu Kegiatan & Jam Mapel</h2>
+                <p class="text-xs text-slate-500 mb-4">Tentukan jam kegiatan harian serta jam pelaksanaan Sesi 1 & Sesi 2.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Apel Pagi / Dzikir</label>
+                        <input type="text" id="time-apel" value="06.50 - 07.30 WIB" placeholder="Contoh: 06.50-07.30" onfocus="clearPlaceholder(this)" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-blue-700 mb-1">Jam Mapel Sesi 1 (Jam 1)</label>
+                        <input type="text" id="time-sesi1" value="07.30 - 09.30 WIB" placeholder="Contoh: 07.30-09.30" onfocus="clearPlaceholder(this)" class="w-full border rounded p-2 text-sm bg-blue-50/50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Sholat Dhuha & Istirahat</label>
+                        <input type="text" id="time-dhuha" value="09.30 - 10.00 WIB" placeholder="Contoh: 09.30-10.00" onfocus="clearPlaceholder(this)" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-blue-700 mb-1">Jam Mapel Sesi 2 (Jam 2)</label>
+                        <input type="text" id="time-sesi2" value="10.00 - 11.30 WIB" placeholder="Contoh: 10.00-11.30" onfocus="clearPlaceholder(this)" class="w-full border rounded p-2 text-sm bg-blue-50/50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Sholat Dzuhur & Pulang</label>
+                        <input type="text" id="time-dzuhur" value="11.30 - 12.00 WIB" placeholder="Contoh: 11.30-12.00" onfocus="clearPlaceholder(this)" class="w-full border rounded p-2 text-sm">
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button onclick="saveGeneralSettings()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm">Simpan Pengaturan Kop & Waktu</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: MASTER MAPEL & GURU -->
+        <section id="tab-teachers" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Master Daftar Mata Pelajaran</h2>
+                        <p class="text-xs text-slate-500">Tambah daftar mapel agar bisa dipilih oleh guru secara multi-select.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-master-mapel" placeholder="Nama Mapel Baru..." onfocus="clearPlaceholder(this)" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm outline-none">
+                        <button onclick="addMasterMapel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">+ Tambah Mapel</button>
+                    </div>
+                </div>
+                <div id="master-mapel-tags" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Daftar Guru & Multi-Select Mapel Diampu</h2>
+                        <p class="text-xs text-slate-500">Satu guru dapat mengajar beberapa mapel (dicegah mengawas di ruang ujian mapel mereka sendiri).</p>
+                    </div>
+                    <button onclick="addTeacherRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ Tambah Guru</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="table-teachers">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700 text-xs uppercase tracking-wider">
+                                <th class="p-3 border-b w-16">Kode</th>
+                                <th class="p-3 border-b w-64">Nama Guru & Gelar</th>
+                                <th class="p-3 border-b">Mapel Diampu (Centang Multi-Select)</th>
+                                <th class="p-3 border-b text-center w-28">Panitia Inti?</th>
+                                <th class="p-3 border-b text-center w-16">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-tbody" class="text-sm"></tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button onclick="saveTeacherData()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition">Simpan Data Guru</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: RUANG & JADWAL 2 SESI -->
+        <section id="tab-rooms" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-900 mb-2">Pengaturan Ruang Ujian & Kelas</h2>
+                <label class="block text-sm font-medium text-slate-700 mb-2">Daftar Ruang & Kelas (Format: Kode (Kelas), pisahkan koma)</label>
+                <input type="text" id="input-rooms" value="R1 (KLS 9B), R2 (KLS 9A), R3 (KLS 9C), R4 (KLS 7A), R5 (KLS 8C), R6 (KLS 7B), R7 (KLS 8A), R8 (KLS 7D), R9 (KLS 7C), R10 (KLS 9D), R11 (KLS 8B)" placeholder="Contoh: R1 (KLS 9A), R2 (KLS 9B)" onfocus="clearPlaceholder(this)" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm outline-none">
+                <div class="mt-4 flex justify-end">
+                    <button onclick="saveRooms()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition">Simpan Ruangan</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="font-bold text-slate-900">Jadwal Harian (2 Mapel per Hari: Sesi 1 & Sesi 2)</h3>
+                        <p class="text-xs text-slate-500">Tiap hari memiliki 2 mata pelajaran utama beserta Panitia Piket harian.</p>
+                    </div>
+                    <button onclick="addScheduleDay()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Tambah Hari Ujian</button>
+                </div>
+                <div id="schedule-days-container" class="space-y-4"></div>
+                <div class="mt-4 flex justify-end">
+                    <button onclick="saveScheduleDays()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition">Simpan Jadwal Harian</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: GENERATOR & EXPORT -->
+        <section id="tab-generator" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">Generator Matriks Pengawas Presisi</h2>
+                    <p class="text-xs text-slate-500">Membentuk tabel matriks dengan kode guru, sebaran adil per ruang, kalkulasi beban, dan ekspor Excel rapi.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="generateMasterSchedule()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-sm transition">⚡ Generate Matriks</button>
+                </div>
+            </div>
+
+            <div id="output-result-container" class="hidden space-y-8">
+                <div class="bg-white p-6 rounded-xl shadow-xs border border-slate-200 print-landscape">
+                    <div class="flex justify-end mb-4 no-print gap-2">
+                        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5">📊 Export ke Excel</button>
+                        <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5">🖨️ Cetak PDF (Landscape)</button>
+                    </div>
+                    <div id="printable-area" class="space-y-4">
+                        <!-- Kop Surat Resmi -->
+                        <div class="text-center border-b-2 border-slate-900 pb-3">
+                            <h2 id="print-instansi" class="text-lg font-bold uppercase">[Nama Sekolah]</h2>
+                            <h1 id="print-school" class="text-xl font-extrabold uppercase">[Nama Sekolah]</h1>
+                            <p id="print-address" class="text-xs text-slate-600">Alamat: ...</p>
+                        </div>
+                        <div class="text-center">
+                            <h3 id="print-exam-title" class="font-bold text-sm uppercase">JADWAL PENGAWAS SUMATIF</h3>
+                            <p id="print-ta" class="text-xs text-slate-600">TAHUN PELAJARAN 2026/2027</p>
+                        </div>
+
+                        <div id="generated-tables-wrapper" class="space-y-4 pt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script Logika Aplikasi -->
+    <script>
+        let defaultMasterMapel = [
+            "Matematika", "Bahasa Indonesia", "IPA", "IPS", "Bahasa Inggris", 
+            "Aqidah Akhlak", "Fiqih", "Qur'an Hadits", "SKI", "PPKN", 
+            "Bahasa Arab", "PJOK", "Seni Rupa", "Kemuhammadiyahan", "TIK"
+        ];
+
+        let defaultTeachers = [
+            { code: 1, name: "Dr. H. Ahmad Fauzi, M.Pd.I", mapel: ["Aqidah Akhlak", "Fiqih"], isCommittee: true },
+            { code: 2, name: "Abdul Wahid, M.Pd", mapel: ["Bahasa Inggris"], isCommittee: false },
+            { code: 3, name: "Ami Wibisono, M.Pd", mapel: ["Bahasa Arab"], isCommittee: false },
+            { code: 4, name: "Uswaton Khasanah, M.Pd", mapel: ["Bahasa Indonesia"], isCommittee: false },
+            { code: 5, name: "Dra. Hj. Siti Aminah", mapel: ["Matematika", "IPA"], isCommittee: false },
+            { code: 6, name: "Eko Prasetyo, S.Kom", mapel: ["TIK"], isCommittee: false },
+            { code: 7, name: "Rina Kusuma Dewi, S.Pd", mapel: ["Seni Rupa", "PJOK"], isCommittee: false },
+            { code: 8, name: "M. Ali Burhan, M.Pd", mapel: ["PPKN"], isCommittee: true },
+            { code: 9, name: "Hafsah Wahyu N. A, S.Pd", mapel: ["IPS"], isCommittee: true },
+            { code: 10, name: "Ahmad Zaini, S.Pd.I", mapel: ["Qur'an Hadits", "SKI"], isCommittee: false },
+            { code: 11, name: "Nur Laili, M.Pd", mapel: ["Bahasa Indonesia", "Kemuhammadiyahan"], isCommittee: false },
+            { code: 12, name: "Budi Santoso, S.Pd", mapel: ["Matematika", "PJOK"], isCommittee: false },
+            { code: 13, name: "Melati Nadhilah Putri, S.Pd", mapel: ["IPA"], isCommittee: false }
+        ];
+
+        let defaultScheduleDays = [
+            { day: "Senin, 30 November 2026", session1: "Matematika", session2: "Aqidah Akhlak", piket: "M. Ali Burhan, M.Pd, Hafsah Wahyu N. A, S.Pd" },
+            { day: "Selasa, 1 Desember 2026", session1: "IPA", session2: "Kemuhammadiyahan", piket: "Abdul Wahid, M.Pd, Ami Wibisono, M.Pd" }
+        ];
+
+        let masterMapel = JSON.parse(localStorage.getItem('app_master_mapel')) || defaultMasterMapel;
+        let teachersData = JSON.parse(localStorage.getItem('app_teachers')) || defaultTeachers;
+        let scheduleDays = JSON.parse(localStorage.getItem('app_schedule')) || defaultScheduleDays;
+        let appSettings = JSON.parse(localStorage.getItem('app_settings')) || {
+            instansi: "MTs. MUHAMMADIYAH 1 MALANG",
+            alamat: "Jl. Joyo Agung No. 5, Malang",
+            jenisUjian: "SUMATIF AKHIR SEMESTER (SAS) GANJIL",
+            ta: "2026/2027",
+            rooms: "R1 (KLS 9B), R2 (KLS 9A), R3 (KLS 9C), R4 (KLS 7A), R5 (KLS 8C), R6 (KLS 7B), R7 (KLS 8A), R8 (KLS 7D), R9 (KLS 7C), R10 (KLS 9D), R11 (KLS 8B)",
+            timeApel: "06.50 - 07.30 WIB",
+            timeSesi1: "07.30 - 09.30 WIB",
+            timeDhuha: "09.30 - 10.00 WIB",
+            timeSesi2: "10.00 - 11.30 WIB",
+            timeDzuhur: "11.30 - 12.00 WIB"
+        };
+
+        // Load settings to form
+        document.getElementById('input-instansi').value = appSettings.instansi;
+        document.getElementById('input-alamat').value = appSettings.alamat;
+        document.getElementById('input-jenis-ujian').value = appSettings.jenisUjian;
+        document.getElementById('input-ta').value = appSettings.ta;
+        document.getElementById('input-rooms').value = appSettings.rooms;
+        document.getElementById('time-apel').value = appSettings.timeApel;
+        document.getElementById('time-sesi1').value = appSettings.timeSesi1;
+        document.getElementById('time-dhuha').value = appSettings.timeDhuha;
+        document.getElementById('time-sesi2').value = appSettings.timeSesi2;
+        document.getElementById('time-dzuhur').value = appSettings.timeDzuhur;
+
+        function clearPlaceholder(el) {
+            el.value = '';
+        }
+
+        function switchTab(tabId) {
+            ['tab-setup', 'tab-teachers', 'tab-rooms', 'tab-generator'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+                document.getElementById('btn-' + id).classList.remove('border-blue-600', 'text-blue-600', 'font-semibold');
+                document.getElementById('btn-' + id).classList.add('border-transparent', 'text-slate-500', 'font-medium');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).classList.add('border-blue-600', 'text-blue-600', 'font-semibold');
+            document.getElementById('btn-' + tabId).classList.remove('border-transparent', 'text-slate-500', 'font-medium');
+
+            if(tabId === 'tab-setup') renderMasterMapelUI();
+            if(tabId === 'tab-teachers') renderTeacherTable();
+            if(tabId === 'tab-rooms') renderScheduleDaysUI();
+        }
+
+        function renderMasterMapelUI() {
+            const container = document.getElementById('master-mapel-tags');
+            container.innerHTML = '';
+            masterMapel.forEach((m, idx) => {
+                container.innerHTML += `
+                    <span class="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-300 text-slate-800 px-3 py-1 rounded-full text-xs font-medium">
+                        ${m}
+                        <button onclick="removeMasterMapel(${idx})" class="text-red-500 hover:text-red-700 font-bold ml-1">×</button>
+                    </span>
+                `;
+            });
+        }
+
+        function addMasterMapel() {
+            const input = document.getElementById('new-master-mapel');
+            const val = input.value.trim();
+            if(val && !masterMapel.includes(val)) {
+                masterMapel.push(val);
+                localStorage.setItem('app_master_mapel', JSON.stringify(masterMapel));
+                input.value = '';
+                renderMasterMapelUI();
+                renderTeacherTable();
+                renderScheduleDaysUI();
+            }
+        }
+
+        function removeMasterMapel(idx) {
+            masterMapel.splice(idx, 1);
+            localStorage.setItem('app_master_mapel', JSON.stringify(masterMapel));
+            renderMasterMapelUI();
+            renderTeacherTable();
+            renderScheduleDaysUI();
+        }
+
+        function renderTeacherTable() {
+            const tbody = document.getElementById('teacher-tbody');
+            tbody.innerHTML = '';
+            teachersData.forEach((t, index) => {
+                let checkboxesHtml = masterMapel.map(m => {
+                    let checked = (t.mapel && t.mapel.includes(m)) ? 'checked' : '';
+                    return `<label class="inline-flex items-center gap-1 mr-3 text-xs"><input type="checkbox" value="${m}" ${checked} class="t-mapel-cb-${index} text-blue-600"> ${m}</label>`;
+                }).join('');
+
+                tbody.innerHTML += `
+                    <tr class="border-b border-slate-100 hover:bg-slate-50">
+                        <td class="p-3"><input type="number" value="${t.code}" class="w-16 border rounded p-1 text-center t-code" data-index="${index}" onfocus="clearPlaceholder(this)"></td>
+                        <td class="p-3"><input type="text" value="${t.name}" class="w-full border rounded p-1 t-name" data-index="${index}" onfocus="clearPlaceholder(this)"></td>
+                        <td class="p-3 multi-select-dropdown bg-white border rounded p-2">${checkboxesHtml}</td>
+                        <td class="p-3 text-center"><input type="checkbox" ${t.isCommittee ? 'checked' : ''} class="w-4 h-4 text-blue-600 t-comm" data-index="${index}"></td>
+                        <td class="p-3 text-center"><button onclick="removeTeacher(${index})" class="text-red-500 hover:text-red-700 font-bold">✕</button></td>
+                    </tr>
+                `;
+            });
+        }
+
+        function addTeacherRow() {
+            const maxCode = teachersData.length > 0 ? Math.max(...teachersData.map(t => t.code)) + 1 : 1;
+            teachersData.push({ code: maxCode, name: "Nama Guru Baru, S.Pd", mapel: [masterMapel[0] || "Umum"], isCommittee: false });
+            renderTeacherTable();
+        }
+
+        function removeTeacher(index) {
+            teachersData.splice(index, 1);
+            renderTeacherTable();
+            saveTeacherData(false);
+        }
+
+        function saveTeacherData(showAlert = true) {
+            const codes = document.querySelectorAll('.t-code');
+            const names = document.querySelectorAll('.t-name');
+            const comms = document.querySelectorAll('.t-comm');
+
+            teachersData = [];
+            for(let i=0; i<codes.length; i++) {
+                let selectedMapel = [];
+                let cbs = document.querySelectorAll(`.t-mapel-cb-${i}`);
+                cbs.forEach(cb => { if(cb.checked) selectedMapel.push(cb.value); });
+
+                teachersData.push({
+                    code: parseInt(codes[i].value) || (i+1),
+                    name: names[i].value,
+                    mapel: selectedMapel,
+                    isCommittee: comms[i].checked
+                });
+            }
+            localStorage.setItem('app_teachers', JSON.stringify(teachersData));
+            if(showAlert) alert('Data guru berhasil disimpan!');
+        }
+
+        function renderScheduleDaysUI() {
+            const container = document.getElementById('schedule-days-container');
+            container.innerHTML = '';
+            scheduleDays.forEach((s, idx) => {
+                let opt1 = masterMapel.map(m => `<option value="${m}" ${s.session1 === m ? 'selected' : ''}>${m}</option>`).join('');
+                let opt2 = masterMapel.map(m => `<option value="${m}" ${s.session2 === m ? 'selected' : ''}>${m}</option>`).join('');
+
+                container.innerHTML += `
+                    <div class="p-4 border border-slate-200 rounded-lg bg-slate-50 space-y-3">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Hari & Tanggal</label>
+                                <input type="text" value="${s.day}" class="w-full border rounded p-2 text-sm s-day" data-index="${idx}" onfocus="clearPlaceholder(this)">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Mapel Sesi 1 (Jam 1)</label>
+                                <select class="w-full border rounded p-2 text-sm s-ses1 bg-white" data-index="${idx}">${opt1}</select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 mb-1">Mapel Sesi 2 (Jam 2)</label>
+                                <select class="w-full border rounded p-2 text-sm s-ses2 bg-white" data-index="${idx}">${opt2}</select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">Panitia Piket Harian</label>
+                            <input type="text" value="${s.piket || ''}" placeholder="Contoh: Ahmad Fauzi, Siti Aminah" class="w-full border rounded p-2 text-sm s-piket" data-index="${idx}" onfocus="clearPlaceholder(this)">
+                        </div>
+                        <div class="flex justify-end">
+                            <button onclick="removeScheduleDay(${idx})" class="bg-red-100 text-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-200">Hapus Hari</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function addScheduleDay() {
+            scheduleDays.push({ day: "Hari Baru, Tanggal", session1: masterMapel[0] || "", session2: masterMapel[1] || "", piket: "Panitia Piket" });
+            renderScheduleDaysUI();
+        }
+
+        function removeScheduleDay(idx) {
+            scheduleDays.splice(idx, 1);
+            renderScheduleDaysUI();
+            saveScheduleDays(false);
+        }
+
+        function saveScheduleDays(showAlert = true) {
+            const days = document.querySelectorAll('.s-day');
+            const ses1 = document.querySelectorAll('.s-ses1');
+            const ses2 = document.querySelectorAll('.s-ses2');
+            const pikets = document.querySelectorAll('.s-piket');
+
+            scheduleDays = [];
+            for(let i=0; i<days.length; i++) {
+                scheduleDays.push({
+                    day: days[i].value,
+                    session1: ses1[i].value,
+                    session2: ses2[i].value,
+                    piket: pikets[i].value
+                });
+            }
+            localStorage.setItem('app_schedule', JSON.stringify(scheduleDays));
+            if(showAlert) alert('Jadwal harian berhasil disimpan!');
+        }
+
+        function saveGeneralSettings() {
+            appSettings.instansi = document.getElementById('input-instansi').value;
+            appSettings.alamat = document.getElementById('input-alamat').value;
+            appSettings.jenisUjian = document.getElementById('input-jenis-ujian').value;
+            appSettings.ta = document.getElementById('input-ta').value;
+            appSettings.timeApel = document.getElementById('time-apel').value;
+            appSettings.timeSesi1 = document.getElementById('time-sesi1').value;
+            appSettings.timeDhuha = document.getElementById('time-dhuha').value;
+            appSettings.timeSesi2 = document.getElementById('time-sesi2').value;
+            appSettings.timeDzuhur = document.getElementById('time-dzuhur').value;
+            
+            localStorage.setItem('app_settings', JSON.stringify(appSettings));
+            alert('Pengaturan kop & waktu berhasil disimpan!');
+        }
+
+        function generateMasterSchedule() {
+            saveTeacherData(false);
+            saveScheduleDays(false);
+
+            const roomsStr = document.getElementById('input-rooms').value;
+            let roomList = [];
+            roomsStr.split(',').forEach(r => {
+                let parts = r.trim().match(/(.*?)\s*\((.*?)\)/);
+                if(parts) {
+                    roomList.push({ kode: parts[1].trim(), kelas: parts[2].trim() });
+                } else if(r.trim()) {
+                    roomList.push({ kode: r.trim(), kelas: "KLS" });
+                }
+            });
+
+            // Tracking frekuensi mengawas tiap guru (untuk kalkulasi sama rata)
+            let dutyCount = {};
+            teachersData.forEach(t => { dutyCount[t.code] = 0; });
+
+            let regularPool = teachersData.filter(t => !t.isCommittee);
+            let committeePool = teachersData.filter(t => t.isCommittee);
+            if(regularPool.length === 0) regularPool = teachersData;
+
+            // Generator matriks dengan algoritma pengacakan ketat per slot/ruang (tidak boleh mapel sendiri & diacak merata)
+            let scheduleMatrix = []; // Simpan data untuk render & export excel
+
+            scheduleDays.forEach(sch => {
+                // Sesi 1
+                let proctorsSes1 = assignProctorsForSlot(sch.session1, roomList, regularPool, committeePool, dutyCount);
+                // Sesi 2
+                let proctorsSes2 = assignProctorsForSlot(sch.session2, roomList, regularPool, committeePool, dutyCount);
+
+                scheduleMatrix.push({
+                    day: sch.day,
+                    piket: sch.piket,
+                    session1Name: sch.session1,
+                    session2Name: sch.session2,
+                    proctorsSes1: proctorsSes1,
+                    proctorsSes2: proctorsSes2
+                });
+            });
+
+            // Render HTML Tabel Utama
+            let htmlOutput = `
+                <div class="overflow-x-auto">
+                    <table class="w-full text-center border border-slate-900 text-[10px]" id="matrix-table">
+                        <thead>
+                            <tr class="bg-slate-200 text-slate-900 font-bold">
+                                <th class="p-2 border border-slate-900 w-28" rowspan="3">Hari / Tanggal</th>
+                                <th class="p-2 border border-slate-900 w-32" rowspan="3">Panitia Piket</th>
+                                <th class="p-2 border border-slate-900 w-24" rowspan="3">Waktu Kegiatan</th>
+            `;
+
+            roomList.forEach(room => {
+                htmlOutput += `<th class="p-1 border border-slate-900">${room.kode}</th>`;
+            });
+
+            htmlOutput += `
+                            </tr>
+                            <tr class="bg-slate-100 text-slate-800 font-semibold">
+            `;
+
+            roomList.forEach(room => {
+                htmlOutput += `<th class="p-1 border border-slate-900 text-[9px]">${room.kelas}</th>`;
+            });
+
+            htmlOutput += `
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            scheduleMatrix.forEach(sch => {
+                // Baris Apel Pagi
+                htmlOutput += `
+                    <tr>
+                        <td class="p-2 border border-slate-900 font-bold bg-slate-50" rowspan="4">${sch.day}</td>
+                        <td class="p-2 border border-slate-900 font-medium bg-slate-50" rowspan="4">${sch.piket}</td>
+                        <td class="p-1.5 border border-slate-900 font-semibold">${appSettings.timeApel}</td>
+                `;
+                roomList.forEach(() => {
+                    htmlOutput += `<td class="p-1.5 border border-slate-900 text-[9px] bg-slate-50">Dzikir Pagi + Murojaah</td>`;
+                });
+                htmlOutput += `</tr>`;
+
+                // Baris Sesi 1
+                htmlOutput += `<tr><td class="p-1.5 border border-slate-900 font-semibold text-blue-900">${appSettings.timeSesi1}<br/><span class="text-[9px] text-slate-600">(${sch.session1Name})</span></td>`;
+                roomList.forEach((room, rIdx) => {
+                    let code = sch.proctorsSes1[rIdx];
+                    htmlOutput += `<td class="p-1.5 border border-slate-900 font-bold text-sm text-blue-700 bg-blue-50/30">${code}</td>`;
+                });
+                htmlOutput += `</tr>`;
+
+                // Baris Sholat Dhuha & Istirahat
+                htmlOutput += `<tr><td class="p-1.5 border border-slate-900 font-semibold">${appSettings.timeDhuha}</td>`;
+                roomList.forEach(() => {
+                    htmlOutput += `<td class="p-1.5 border border-slate-900 text-[8px] bg-slate-50">Sholat Dhuha & Istirahat</td>`;
+                });
+                htmlOutput += `</tr>`;
+
+                // Baris Sesi 2
+                htmlOutput += `<tr><td class="p-1.5 border border-slate-900 font-semibold text-blue-900">${appSettings.timeSesi2}<br/><span class="text-[9px] text-slate-600">(${sch.session2Name})</span></td>`;
+                roomList.forEach((room, rIdx) => {
+                    let code = sch.proctorsSes2[rIdx];
+                    htmlOutput += `<td class="p-1.5 border border-slate-900 font-bold text-sm text-blue-700 bg-blue-50/30">${code}</td>`;
+                });
+                htmlOutput += `</tr>`;
+            });
+
+            htmlOutput += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            // Tabel Kalkulasi Beban Mengawas & Keterangan Kode Guru
+            htmlOutput += `
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 pt-3 border-t border-slate-300">
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-xs mb-2 uppercase tracking-wide">KETERANGAN KODE GURU & PENGAWAS:</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+            `;
+
+            teachersData.forEach(t => {
+                let tag = t.isCommittee ? ' <span class="text-[9px] bg-amber-100 text-amber-800 px-1 rounded">Panitia</span>' : '';
+                let mapelsStr = t.mapel ? t.mapel.join(', ') : '-';
+                htmlOutput += `<div class="border border-slate-200 p-1.5 rounded bg-slate-50"><b>${t.code}.</b> ${t.name}${tag}<br/><span class="text-[9px] text-slate-500">Mapel: ${mapelsStr}</span></div>`;
+            });
+
+            htmlOutput += `
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-xs mb-2 uppercase tracking-wide">KALKULASI FREKUENSI MENGAWAS (SAMA RATA):</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border border-slate-300 text-xs bg-slate-50">
+                               <thead>
+                                   <tr class="bg-slate-200 text-slate-800 font-bold">
+                                       <th class="p-2 border border-slate-300 w-12 text-center">Kode</th>
+                                       <th class="p-2 border border-slate-300">Nama Guru</th>
+                                       <th class="p-2 border border-slate-300 w-28 text-center">Jumlah Masuk (Kali)</th>
+                                   </tr>
+                               </thead>
+                               <tbody>
+            `;
+
+            teachersData.forEach(t => {
+                htmlOutput += `
+                    <tr>
+                        <td class="p-1.5 border border-slate-300 text-center font-bold">${t.code}</td>
+                        <td class="p-1.5 border border-slate-300">${t.name}</td>
+                        <td class="p-1.5 border border-slate-300 text-center font-bold text-blue-600">${dutyCount[t.code] || 0}</td>
+                    </tr>
+                `;
+            });
+
+            htmlOutput += `
+                               </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('print-instansi').innerText = appSettings.instansi;
+            document.getElementById('print-school').innerText = appSettings.instansi;
+            document.getElementById('print-address').innerText = "Alamat: " + appSettings.alamat;
+            document.getElementById('print-exam-title').innerText = "JADWAL PENGAWAS " + appSettings.jenisUjian;
+            document.getElementById('print-ta').innerText = "TAHUN PELAJARAN " + appSettings.ta;
+
+            document.getElementById('generated-tables-wrapper').innerHTML = htmlOutput;
+            document.getElementById('output-result-container').classList.remove('hidden');
+            switchTab('tab-generator');
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        // Fungsi pembantu pengacakan adil per slot ujian (memastikan beda orang per ruang & tidak mengajar mapel tersebut & beban seimbang)
+        function assignProctorsForSlot(currentMapel, roomList, regularPool, committeePool, dutyCount) {
+            let assignedCodes = [];
+            // Gabungkan pool dengan prioritas yang beban mengajarnya paling sedikit (untuk meratakan)
+            let combinedPool = [...regularPool, ...committeePool];
+
+            roomList.forEach(() => {
+                // Urutkan kandidat berdasarkan beban mengawas paling sedikit saat ini, lalu acak sedikit
+                let validCandidates = combinedPool.filter(t => {
+                    let teaches = t.mapel && t.mapel.some(m => currentMapel.toLowerCase().includes(m.toLowerCase()) || m.toLowerCase().includes(currentMapel.toLowerCase()));
+                    let alreadyAssignedInThisSlot = assignedCodes.includes(t.code);
+                    return !teaches && !alreadyAssignedInThisSlot;
+                });
+
+                if(validCandidates.length === 0) {
+                    // Fallback jika semua mengajar mapel ini, ambil yang tidak di slot ini
+                    validCandidates = combinedPool.filter(t => !assignedCodes.includes(t.code));
+                }
+                if(validCandidates.length === 0) {
+                    validCandidates = combinedPool; // Ultra fallback
+                }
+
+                // Urutkan berdasarkan dutyCount terendah agar adil sama rata
+                validCandidates.sort((a, b) => (dutyCount[a.code] || 0) - (dutyCount[b.code] || 0));
+
+                // Ambil dari kelompok terendah secara acak
+                let minDuty = dutyCount[validCandidates[0].code] || 0;
+                let lowestGroup = validCandidates.filter(t => (dutyCount[t.code] || 0) <= minDuty + 1);
+                let chosen = lowestGroup[Math.floor(Math.random() * lowestGroup.length)];
+
+                assignedCodes.push(chosen.code);
+                dutyCount[chosen.code] = (dutyCount[chosen.code] || 0) + 1;
+            });
+
+            return assignedCodes;
+        }
+
+        function exportToExcel() {
+            // Membuat workbook rapi untuk Excel dari area printable
+            let element = document.getElementById('printable-area');
+            let wb = XLSX.utils.book_new();
+            
+            // Ekspor tabel matriks utama
+            let table = document.querySelector("#matrix-table");
+            if(!table) {
+                alert("Silakan generate jadwal terlebih dahulu!");
+                return;
+            }
+            let ws1 = XLSX.utils.table_to_sheet(table);
+            XLSX.utils.book_append_sheet(wb, ws1, "Jadwal Pengawas");
+
+            XLSX.writeFile(wb, "Jadwal_Pengawas_Ujian_Lengkap.xlsx");
+        }
+
+        renderMasterMapelUI();
+        renderTeacherTable();
+        renderScheduleDaysUI();
+    </script>
+</body>
+</html>
